@@ -1,21 +1,33 @@
-const ng: ((parameters: string[]) => Promise<any>) = require('./ng');
-const tmp = require('./tmp');
+import * as path from 'path';
+import {writeFile, readFile} from 'fs-extra';
+import { ng } from './ng';
+import { setup, teardown } from './tmp';
+
+export { ng };
 
 export function setupProject() {
   beforeEach((done) => {
     spyOn(console, 'error');
 
-    tmp.setup('./tmp')
+    setup('./tmp')
       .then(() => process.chdir('./tmp'))
       .then(() => ng(['new', 'foo', '--skip-install']))
+      .then(() => addAppToProject())
       .then(done, done.fail);
   }, 10000);
 
   afterEach((done) => {
-    tmp.teardown('./tmp').then(done, done.fail);
+    teardown('./tmp').then(done, done.fail);
   });
 }
 
-export {
-  ng
-};
+function addAppToProject(): Promise<any> {
+  const cliJson = path.join(path.join(process.cwd()), '.angular-cli.json');
+  return readFile(cliJson, 'utf-8').then(content => {
+    const json = JSON.parse(content);
+    json.apps.push(({name: 'other', root: 'other/src', appRoot: ''}));
+    return json;
+  }).then(json => {
+    return writeFile(cliJson, JSON.stringify(json, null, 2))
+  });
+}
